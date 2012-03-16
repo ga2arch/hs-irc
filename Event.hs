@@ -22,8 +22,8 @@ type MyState = Map.Map String [(String -> EventNet ())]
 runEventNet :: Bot -> EventNet a -> IO (a, MyState)
 runEventNet st action = runReaderT (runStateT (unEN action) Map.empty) st
 
-subscribe :: String -> (String -> EventNet ()) -> EventNet ()
-subscribe evt fun = do
+subscribe :: (String, (String -> EventNet ())) -> EventNet ()
+subscribe (evt,fun) = do
                   m <- get
                   let funs = lookup evt m
                   let nm = Map.insert evt (fun:funs) m
