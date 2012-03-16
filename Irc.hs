@@ -41,8 +41,8 @@ connect = do
 run :: EventNet ()
 run = do
     mapM subscribe [("ping", pong),
-                   ("id", cmdId),
-                   ("hpaste", cmdHpaste)]
+                    ("id", cmdId),
+                    ("hpaste", cmdHpaste)]
     write "NICK" nick
     write "USER" $ nick ++ " 0 * :tut bot"
     write "JOIN" channel
