@@ -17,12 +17,12 @@ type Net = ReaderT Bot IO
 newtype EventNet a = EN {unEN :: StateT MyState Net a}
       deriving (Monad,MonadState MyState,MonadReader Bot,MonadIO)
 
-type MyState = Map.Map String [(String -> EventNet ())]
+type MyState = Map.Map String [(String -> String -> EventNet ())]
 
 runEventNet :: Bot -> EventNet a -> IO (a, MyState)
 runEventNet st action = runReaderT (runStateT (unEN action) Map.empty) st
 
-subscribe :: (String, (String -> EventNet ())) -> EventNet ()
+subscribe :: (String, (String -> String -> EventNet ())) -> EventNet ()
 subscribe (evt,fun) = do
                   m <- get
                   let funs = lookup evt m
@@ -30,16 +30,16 @@ subscribe (evt,fun) = do
                   put nm
                   return ()
 
-broadcast :: String -> String -> EventNet ()
-broadcast evt args = do
+broadcast :: String -> String -> String -> EventNet ()
+broadcast evt chan args = do
           m <- get
           let funs = lookup evt m
-          mapM (\f -> f args) funs
+          mapM (\f -> f chan args) funs
           return ()
 
 lookup :: String
-       -> Map.Map String [(String -> EventNet ())]
-       -> [(String -> EventNet ())]
+       -> Map.Map String [(String -> String -> EventNet ())]
+       -> [(String -> String -> EventNet ())]
 lookup evt m = case (Map.lookup evt m) of
-       Nothing -> [(\x -> return ())]
+       Nothing -> [(\_ _ -> return ())]
        Just funs  -> funs

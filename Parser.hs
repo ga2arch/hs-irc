@@ -47,13 +47,13 @@ parseServerLine = do
 
 parseLine :: Parser Message
 parseLine = do
-          username <- parseUsername
+          nick <- parseUsername
           cmd <- parseCmd
-          chan <- parseChan
+          cn <- parseChan
           msg <- (parseMessage <|> string "")
           return msg
-          return Message { username = username
-                         , chan = chan
+          return Message { username = nick
+                         , chan = cn
                          , command = cmd
                          , message = msg
                          }
@@ -77,7 +77,8 @@ parseChan :: Parser String
 parseChan = do
           char '#'
           chan <- pstr
-          return chan
+          space
+          return $ '#':chan
 
 parseMessage :: Parser String
 parseMessage = do
@@ -86,7 +87,7 @@ parseMessage = do
              return msg
 
 serverParser :: Parser Message
-serverParser = try (parseServerLine) <|> parseLine
+serverParser = parseLine
 
 
 userCmdParser :: Parser UserCmd

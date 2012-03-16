@@ -29,9 +29,6 @@ main = do
   where
     disconnect = hClose . socket
 
-test :: String -> EventNet ()
-test x = privmsg "Working !!"
-
 connect :: IO Bot
 connect = do
         h <- connectTo server $ PortNumber $ fromIntegral port
@@ -46,6 +43,7 @@ run = do
     write "NICK" nick
     write "USER" $ nick ++ " 0 * :tut bot"
     write "JOIN" channel
+    write "JOIN" "#bot-test2"
     s <- asks socket
     ircLoop s
     return ()
@@ -54,39 +52,36 @@ write :: String -> String -> EventNet ()
 write s t = do
       h <- asks socket
       liftIO $ hPrintf h "%s %s \r\n" s t
-      --liftIO $ printf "> %s %s \n" s t
+      liftIO $ printf "> %s %s \n" s t
 
 ircLoop :: Handle -> EventNet ()
 ircLoop h = forever $ do
         t <- liftIO $ hGetLine h
         let s = init t
-        if ping s then broadcast "ping" s else eval $ runP serverParser s
+        liftIO $ putStrLn s
+        if ping s then broadcast "ping" "" s else eval $ runP serverParser s
    where
         ping x = "PING :" `isPrefixOf` x
 
 eval :: Maybe Message -> EventNet ()
-eval (Just m) = if "@" `isPrefixOf` msg
-                then dispatch $ runP userCmdParser msg
+eval (Just m) = if "@" `isPrefixOf` (message m)
+                then dispatch (chan m) $ runP userCmdParser (message m)
                 else return ()
      where
-        msg = message m
-        dispatch (Just u) = broadcast (cmd u) (args u)
-        dispatch _ = return ()
+        dispatch chan (Just u) = broadcast (cmd u) chan (args u)
+        dispatch _ _ = return ()
 eval _ = return ()
 
-privmsg :: String -> EventNet ()
-privmsg s = write "PRIVMSG" $ channel ++ " :" ++ s
+privmsg :: String -> String -> EventNet ()
+privmsg chan s = do
+        write "PRIVMSG" $ chan ++ " :" ++ s
+        return ()
 
-msg :: Handle -> String -> IO ()
-msg h s = hPrintf h "PRIVMSG %s \r\n" $ channel ++ " :" ++ s
+pong :: String -> String -> EventNet ()
+pong _ x = write "PONG" $ ':' : drop 6 x
 
+cmdId :: String -> String -> EventNet ()
+cmdId chan x = privmsg chan x
 
-
-pong :: String -> EventNet ()
-pong x = write "PONG" $ ':' : drop 6 x
-
-cmdId :: String -> EventNet ()
-cmdId x = privmsg x
-
-cmdHpaste :: String -> EventNet ()
-cmdHpaste x = privmsg "http://hpaste.org"
+cmdHpaste :: String -> String -> EventNet ()
+cmdHpaste chan x = privmsg chan "http://hpaste.org"
