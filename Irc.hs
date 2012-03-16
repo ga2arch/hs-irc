@@ -44,7 +44,7 @@ run = do
     write "USER" $ nick ++ " 0 * :tut bot"
     write "JOIN" channel
     s <- asks socket
-    listen s
+    ircLoop s
     return ()
 
 write :: String -> String -> EventNet ()
@@ -53,31 +53,31 @@ write s t = do
       liftIO $ hPrintf h "%s %s \r\n" s t
       --liftIO $ printf "> %s %s \n" s t
 
-listen :: Handle -> EventNet ()
-listen h = forever $ do
-      t <- liftIO $ hGetLine h
-      let s = init t
-      if ping s then pong s else eval $ runP serverParser s
-      liftIO $ putStrLn s
+ircLoop :: Handle -> EventNet ()
+ircLoop h = forever $ do
+        t <- liftIO $ hGetLine h
+        let s = init t
+        if ping s then broadcast "ping" s else eval $ runP serverParser s
    where
-      --clean = drop 1 . dropWhile (/= ':') . drop 1
-      ping x = "PING :" `isPrefixOf` x
-      pong x = write "PONG" $ ':' : drop 6 x
+        ping x = "PING :" `isPrefixOf` x
 
 eval :: Maybe Message -> EventNet ()
-eval (Just m) = dispatch $ runP userCmdParser $ message m
+eval (Just m) = if "@" `isPrefixOf` msg
+                then dispatch $ runP userCmdParser msg
+                else return ()
+     where
+        msg = message m
+        dispatch (Just u) = broadcast (cmd u) (args u)
+        dispatch _ = return ()
 eval _ = return ()
-
-dispatch :: Maybe UserCmd -> EventNet ()
-dispatch (Just u) = case (cmd u) of
-                  "id" -> privmsg $ args u
-                  "sayHi" -> privmsg "Hi chico"
-                  "broad" -> broadcast "test"
-                  _ -> privmsg "not implemented"
-dispatch _ = return ()
 
 privmsg :: String -> EventNet ()
 privmsg s = write "PRIVMSG" $ channel ++ " :" ++ s
 
 msg :: Handle -> String -> IO ()
 msg h s = hPrintf h "PRIVMSG %s \r\n" $ channel ++ " :" ++ s
+
+
+
+pong :: String -> EventNet
+pong x = privmsg "PONG :" ++ drop 6 x

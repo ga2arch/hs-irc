@@ -30,7 +30,7 @@ subscribe evt fun = do
                   put nm
                   return ()
 
-broadcast :: String -> EventNet ()
+broadcast :: String -> String -> EventNet ()
 broadcast evt args = do
           m <- get
           let funs = lookup evt m
