@@ -8,6 +8,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Maybe
+import Data.List
 
 import Parser
 
@@ -25,7 +26,7 @@ data Args = M Message
           | None
   deriving (Show)
 
-type Plugin = Args -> EIrc ()
+type Plugin = Args -> Event -> Int -> EIrc ()
 type Plugins = [Plugin]
 type Channel = String
 
@@ -43,12 +44,21 @@ subscribe :: (Event, Plugin) -> EIrc ()
 subscribe (evt, fun) = do
     m <- get
     let funs = fromMaybe [] $ Map.lookup evt m
-    let nm = Map.insert evt (fun:funs) m
-    put nm
+    put $ Map.insert evt (fun:funs) m
     return ()
+
+unsubscribe :: (Event, Int) -> EIrc ()
+unsubscribe (evt, i) = do
+    m <- get
+    let funs = fromMaybe [] $ Map.lookup evt m
+    put $ Map.insert evt (delNth i funs) m
+    return ()
+  where
+    delNth _ [] = []
+    delNth n xs = take (n-1) xs ++ drop n xs
 
 broadcast :: Event -> Args -> EIrc ()
 broadcast evt args = do
     m <- get
     let funs = fromMaybe [] $ Map.lookup evt m
-    mapM_ (\f -> f args) funs
+    mapM_ (\(f, i) -> f args evt i) $ zip funs (iterate (+1) 1)

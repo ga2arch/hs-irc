@@ -55,32 +55,33 @@ write s t = do
 privmsg :: Channel -> String -> EIrc ()
 privmsg chan s = write "PRIVMSG" $ chan ++ " :" ++ s
 
-onConnect _ = do
+onConnect _ _ _ = do
     write "NICK" "lb-2"
     write "USER" $ "lb 0 * :tut bot"
     write "JOIN" "#bot-test"
 
-onPing (S s) = do
+onPing (S s) _ _ = do
     write "PONG :" s
 
-onPrivmsg (M m) = if "@" `isPrefixOf` (userMsg m)
+onPrivmsg (M m) _ _ = if "@" `isPrefixOf` (userMsg m)
                      then route $ runP userCmdParser (userMsg m)
                      else return ()
   where
     route (Just c) = broadcast (UserCmd $ cmd c) $ D m c
     route _ = return ()
 
-onCmdId (D m c) = do
+onCmdId (D m c) _ _ = do
     privmsg (channel m) $ "You said: " ++ (args c)
 
-onCmdTell (D m c) = do
+onCmdTell (D m c) _ _ = do
     let (n, msg) = fromMaybe ("","") $ runP parser (args c)
     subscribe
         (IrcCmd "JOIN",
-        (\(M message) -> do
+        (\(M message) evt i -> do
               if (nick message) == n
-                  then privmsg (channel message) $ (nick m) ++ " tell ya: " ++ msg
+                  then do
+                       privmsg (channel message) $ (nick m) ++ " tell ya: " ++ msg
+                       unsubscribe (evt, i)
                   else return ()))
-    return ()
   where
     parser = liftM2 (,) (many1 alphaNum) (space >> many1 anyToken)
