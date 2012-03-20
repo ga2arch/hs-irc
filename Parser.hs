@@ -43,15 +43,15 @@ parseCmd :: Parser String
 parseCmd = piece >> between space space (many1 alphaNum)
 
 parseChan :: Parser String
-parseChan = try $ liftM ('#':) (between (char '#') space piece) <|> string ""
+parseChan = lookAhead (char '#') >> piece
 
 parseMessage :: Parser String
-parseMessage = try $ char ':' >> many1 anyToken <|> string ""
+parseMessage = try (space >> char ':' >> many1 anyToken) <|> string ""
 
 userCmdParser :: Parser Cmd
 userCmdParser = char '@' >>
               Cmd <$> piece
-                  <*> liftM tail (try $ many1 anyToken <|> string " ")
+                  <*> liftM tail ((try $ many1 anyToken) <|> string " ")
 
 runP :: Parser a -> String -> Maybe a
 runP p input

@@ -4,6 +4,8 @@ import System.IO.Error
 import Text.Printf
 import Data.List
 import Control.Monad.Reader
+import Text.ParserCombinators.Parsec hiding (many, optional, (<|>))
+import Data.Maybe
 
 import Irc
 import Parser
@@ -12,15 +14,15 @@ main :: IO ()
 main = do
     bot <- connect "irc.freenode.org" 6667
     runEIrc bot (loop [(Connected, onConnect),
-                       (Connected, onTest),
                        (Ping, onPing),
                        (IrcCmd "PRIVMSG", onPrivmsg),
-                       (UserCmd "id", onCmdId)])
+                       (UserCmd "id", onCmdId),
+                       (UserCmd "tell", onCmdTell)])
     return ()
 
 connect :: String -> Int -> IO Bot
 connect server port = do
-    h <- connectTo server $ PortNumber $ fromIntegral port
+    h <- connectTo server . PortNumber . fromIntegral $ port
     hSetBuffering h NoBuffering
     return $ Bot h
 
@@ -69,8 +71,16 @@ onPrivmsg (M m) = if "@" `isPrefixOf` (userMsg m)
     route _ = return ()
 
 onCmdId (D m c) = do
-    privmsg (channel m) $ "Hai detto:" ++ (args c)
+    privmsg (channel m) $ "You said: " ++ (args c)
 
-onTest _ = do
-    liftIO $ print "Connesso"
+onCmdTell (D m c) = do
+    let (n, msg) = fromMaybe ("","") $ runP parser (args c)
+    subscribe
+        (IrcCmd "JOIN",
+        (\(M message) -> do
+              if (nick message) == n
+                  then privmsg (channel message) $ (nick m) ++ " tell ya: " ++ msg
+                  else return ()))
     return ()
+  where
+    parser = liftM2 (,) (many1 alphaNum) (space >> many1 anyToken)
