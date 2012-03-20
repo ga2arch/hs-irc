@@ -34,20 +34,21 @@ type Irc = ReaderT Bot IO
 newtype EIrc a = EI { unEI :: StateT MState Irc a}
         deriving (Monad, MonadState MState, MonadReader Bot, MonadIO)
 
-type MState = Map.Map Event Plugin
+type MState = Map.Map Event Plugins
 
 runEIrc :: Bot -> EIrc a -> IO (a, MState)
 runEIrc st action = runReaderT (runStateT (unEI action) Map.empty) st
 
 subscribe :: (Event, Plugin) -> EIrc ()
-subscribe (evt, p) = do
+subscribe (evt, fun) = do
     m <- get
-    let nm = Map.insert evt p m
+    let funs = fromMaybe [] $ Map.lookup evt m
+    let nm = Map.insert evt (fun:funs) m
     put nm
     return ()
 
 broadcast :: Event -> Args -> EIrc ()
 broadcast evt args = do
     m <- get
-    let fun = fromMaybe (\_ -> return ()) $ Map.lookup evt m
-    fun args
+    let funs = fromMaybe [] $ Map.lookup evt m
+    mapM_ (\f -> f args) funs

@@ -12,10 +12,10 @@ main :: IO ()
 main = do
     bot <- connect "irc.freenode.org" 6667
     runEIrc bot (loop [(Connected, onConnect),
+                       (Connected, onTest),
                        (Ping, onPing),
                        (IrcCmd "PRIVMSG", onPrivmsg),
-                       (UserCmd "id", onCmdId),
-                       (IrcCmd "NICK", onNickChange)])
+                       (UserCmd "id", onCmdId)])
     return ()
 
 connect :: String -> Int -> IO Bot
@@ -71,4 +71,6 @@ onPrivmsg (M m) = if "@" `isPrefixOf` (userMsg m)
 onCmdId (D m c) = do
     privmsg (channel m) $ "Hai detto:" ++ (args c)
 
-onNickChange (M m) = do return ()
+onTest _ = do
+    liftIO $ print "Connesso"
+    return ()
