@@ -64,8 +64,8 @@ onPing (S s) _ _ = do
     write "PONG :" s
 
 onPrivmsg (M m) _ _ = if "@" `isPrefixOf` (userMsg m)
-                     then route $ runP userCmdParser (userMsg m)
-                     else return ()
+                         then route $ runP userCmdParser (userMsg m)
+                         else return ()
   where
     route (Just c) = broadcast (UserCmd $ cmd c) $ D m c
     route _ = return ()
@@ -81,7 +81,7 @@ onCmdTell (D m c) _ _ = do
               if (nick message) == n
                   then do
                        privmsg (channel message) $ (nick m) ++ " tell ya: " ++ msg
-                       unsubscribe (evt, i)
+                       unsubscribe evt  i
                   else return ()))
   where
     parser = liftM2 (,) (many1 alphaNum) (space >> many1 anyToken)

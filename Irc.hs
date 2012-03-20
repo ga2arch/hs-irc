@@ -47,8 +47,8 @@ subscribe (evt, fun) = do
     put $ Map.insert evt (fun:funs) m
     return ()
 
-unsubscribe :: (Event, Int) -> EIrc ()
-unsubscribe (evt, i) = do
+unsubscribe :: Event -> Int -> EIrc ()
+unsubscribe evt i = do
     m <- get
     let funs = fromMaybe [] $ Map.lookup evt m
     put $ Map.insert evt (delNth i funs) m
