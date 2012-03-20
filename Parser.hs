@@ -10,52 +10,48 @@ import Control.Applicative
 import Text.ParserCombinators.Parsec hiding (many, optional, (<|>))
 import Control.Monad
 
-data Message = Message { nick :: String
-                       , command :: String
-                       , channel :: String
-                       , userMsg :: String
-                       }
-    deriving (Show)
+data Message = Message
+     { nick :: String
+     , command :: String
+     , channel :: String
+     , userMsg :: String
+     }
+  deriving (Show)
 
-data Cmd = Cmd { cmd :: String
-               , args :: String
-               }
-    deriving (Show)
+data Cmd = Cmd
+     { cmd :: String
+     , args :: String
+     }
+  deriving (Show)
 
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~."
 
-word :: Parser String
-word = many1 alphaNum
-
-pstr :: Parser String
-pstr = many1 $ symbol <|> alphaNum
-
-parseLine :: Parser Message
-parseLine = Message
-          <$> parseUsername
-          <*> parseCmd
-          <*> (try (parseChan) <|> string "")
-          <*> (try (parseMessage <|> string ""))
-
-parseUsername :: Parser String
-parseUsername = between (char ':') (char '!') word
-
-parseCmd :: Parser String
-parseCmd = pstr >> between space space word
-
-parseChan :: Parser String
-parseChan = liftM ('#':) (between (char '#') space pstr)
-
-parseMessage :: Parser String
-parseMessage = (char ':') >> (many1 $ symbol <|> alphaNum <|> space)
+piece = many1 $ symbol <|> alphaNum
 
 serverParser :: Parser Message
-serverParser = parseLine
+serverParser = Message
+    <$> parseUsername
+    <*> parseCmd
+    <*> parseChan
+    <*> (try (parseMessage <|> string ""))
+
+parseUsername :: Parser String
+parseUsername = between (char ':') (char '!') (many1 alphaNum)
+
+parseCmd :: Parser String
+parseCmd = piece >> between space space (many1 alphaNum)
+
+parseChan :: Parser String
+parseChan = try $ liftM ('#':) (between (char '#') space piece) <|> string ""
+
+parseMessage :: Parser String
+parseMessage = try $ char ':' >> many1 anyToken <|> string ""
 
 userCmdParser :: Parser Cmd
-userCmdParser = (char '@') >> (Cmd <$> pstr
-              <*> (try (many1 $ symbol <|> alphaNum <|> space) <|> string ""))
+userCmdParser = char '@' >>
+              Cmd <$> piece
+                  <*> liftM tail (try $ many1 anyToken <|> string " ")
 
 runP :: Parser a -> String -> Maybe a
 runP p input

@@ -42,9 +42,7 @@ loop ps = do
   where
     ping x = "PING :" `isPrefixOf` x
     startPlugins = mapM_ subscribe
-    route (Just m) = do
-        liftIO $ print m
-        broadcast (IrcCmd $ command m) $ M m
+    route (Just m) = broadcast (IrcCmd $ command m) $ M m
     route _ = return ()
 
 write :: String -> String -> EIrc ()
@@ -54,7 +52,6 @@ write s t = do
 
 privmsg :: Channel -> String -> EIrc ()
 privmsg chan s = write "PRIVMSG" $ chan ++ " :" ++ s
-
 
 onConnect _ = do
     write "NICK" "lb-2"
@@ -70,6 +67,6 @@ onPrivmsg (M m) = route $ runP userCmdParser (userMsg m)
     route _ = return ()
 
 onCmdId (D m c) = do
-    write "PRIVMSG" $ (channel m) ++ " :" ++ (args c)
+    write "PRIVMSG" $ (channel m) ++ " :" ++ "Hai detto:" ++ (args c)
 
 onNickChange (M m) = do return ()
