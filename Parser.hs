@@ -34,7 +34,7 @@ serverParser = Message
     <$> parseUsername
     <*> parseCmd
     <*> parseChan
-    <*> (try (parseMessage <|> string ""))
+    <*> parseMessage
 
 parseUsername :: Parser String
 parseUsername = between (char ':') (char '!') (many1 alphaNum)
