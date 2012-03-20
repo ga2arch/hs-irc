@@ -1,6 +1,6 @@
 module Parser
        ( Message(..)
-       , UserCmd(..)
+       , Cmd(..)
        , serverParser
        , userCmdParser
        , runP
@@ -10,16 +10,16 @@ import Control.Applicative
 import Text.ParserCombinators.Parsec hiding (many, optional, (<|>))
 import Control.Monad
 
-data Message = Message { username :: String
+data Message = Message { nick :: String
                        , command :: String
-                       , chan :: String
-                       , message :: String
+                       , channel :: String
+                       , userMsg :: String
                        }
     deriving (Show)
 
-data UserCmd = UserCmd { cmd :: String
-                       , args :: String
-                       }
+data Cmd = Cmd { cmd :: String
+               , args :: String
+               }
     deriving (Show)
 
 symbol :: Parser Char
@@ -32,10 +32,11 @@ pstr :: Parser String
 pstr = many1 $ symbol <|> alphaNum
 
 parseLine :: Parser Message
-parseLine = Message <$> parseUsername
+parseLine = Message
+          <$> parseUsername
           <*> parseCmd
-          <*> parseChan
-          <*> (parseMessage <|> string "")
+          <*> (try (parseChan) <|> string "")
+          <*> (try (parseMessage <|> string ""))
 
 parseUsername :: Parser String
 parseUsername = between (char ':') (char '!') word
@@ -52,8 +53,8 @@ parseMessage = (char ':') >> (many1 $ symbol <|> alphaNum <|> space)
 serverParser :: Parser Message
 serverParser = parseLine
 
-userCmdParser :: Parser UserCmd
-userCmdParser = (char '@') >> (UserCmd <$> pstr
+userCmdParser :: Parser Cmd
+userCmdParser = (char '@') >> (Cmd <$> pstr
               <*> (try (many1 $ symbol <|> alphaNum <|> space) <|> string ""))
 
 runP :: Parser a -> String -> Maybe a

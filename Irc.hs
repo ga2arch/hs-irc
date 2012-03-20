@@ -1,82 +1,53 @@
-import System.IO
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+module Irc where
+
 import Network
+import System.IO
 import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Map as Map
-import Text.Printf
-import Data.List
-import System.Exit
-import Control.Arrow
-import Control.Exception
-import Control.Concurrent
-import Prelude hiding (catch)
+import Data.Maybe
+
 import Parser
-import Event
 
-server = "irc.freenode.org"
-port = 6667
-channel = "#bot-test"
-nick = "lambot"
+data Bot = Bot { socket :: Handle }
+data Event = Connected
+           | Disconnected
+           | IrcCmd String
+           | UserCmd String
+           | Ping
+  deriving (Show, Ord, Eq)
 
-main :: IO ()
-main = do
-     st <- connect
-     runEventNet st run
-     return ()
-  where
-    disconnect = hClose . socket
+data Args = M Message
+          | S String
+          | D Message Cmd
+          | None
+  deriving (Show)
 
-connect :: IO Bot
-connect = do
-        h <- connectTo server $ PortNumber $ fromIntegral port
-        hSetBuffering h NoBuffering
-        return $ Bot h
+type Plugin = Args -> EIrc ()
+type Plugins = [Plugin]
+type Channel = String
 
-run :: EventNet ()
-run = do
-    mapM subscribe [("id", cmdId),
-                    ("hpaste", cmdHpaste)]
-    write "NICK" nick
-    write "USER" $ nick ++ " 0 * :tut bot"
-    write "JOIN" channel
-    write "JOIN" "#bot-test2"
-    s <- asks socket
-    ircLoop s
+type Irc = ReaderT Bot IO
+
+newtype EIrc a = EI { unEI :: StateT MState Irc a}
+        deriving (Monad, MonadState MState, MonadReader Bot, MonadIO)
+
+type MState = Map.Map Event Plugin
+
+runEIrc :: Bot -> EIrc a -> IO (a, MState)
+runEIrc st action = runReaderT (runStateT (unEI action) Map.empty) st
+
+subscribe :: (Event, Plugin) -> EIrc ()
+subscribe (evt, p) = do
+    m <- get
+    let nm = Map.insert evt p m
+    put nm
     return ()
 
-write :: String -> String -> EventNet ()
-write s t = do
-      h <- asks socket
-      liftIO $ hPrintf h "%s %s \r\n" s t
-      -- liftIO $ printf "> %s %s \n" s t
-
-ircLoop :: Handle -> EventNet ()
-ircLoop h = forever $ do
-        t <- liftIO $ hGetLine h
-        let s = init t
-        liftIO $ putStrLn s
-        if ping s then pong s else eval $ runP serverParser s
-   where
-        ping x = "PING :" `isPrefixOf` x
-        pong x = write "PONG" $ ':' : drop 6 x
-
-eval :: Maybe Message -> EventNet ()
-eval (Just m) = if "@" `isPrefixOf` (message m)
-                then dispatch m $ runP userCmdParser (message m)
-                else return ()
-     where
-        dispatch m (Just u) = broadcast (cmd u) m u
-        dispatch _ _ = return ()
-eval _ = return ()
-
-privmsg :: String -> String -> EventNet ()
-privmsg chan s = write "PRIVMSG" $ chan ++ " :" ++ s
-
-cmdId :: Message -> UserCmd -> EventNet ()
-cmdId m u = privmsg (chan m) (message m)
-
-cmdHpaste :: Message -> UserCmd -> EventNet ()
-cmdHpaste m u = privmsg (chan m) "http://hpaste.org"
-
-cmdTell :: Message -> UserCmd -> EventNet ()
-cmdTell m u = privmsg (chan m) ""
+broadcast :: Event -> Args -> EIrc ()
+broadcast evt args = do
+    m <- get
+    let fun = fromMaybe (\_ -> return ()) $ Map.lookup evt m
+    fun args
