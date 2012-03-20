@@ -69,6 +69,6 @@ onPrivmsg (M m) = if "@" `isPrefixOf` (userMsg m)
     route _ = return ()
 
 onCmdId (D m c) = do
-    write "PRIVMSG" $ (channel m) ++ " :" ++ "Hai detto:" ++ (args c)
+    privmsg (channel m) $ "Hai detto:" ++ (args c)
 
 onNickChange (M m) = do return ()
