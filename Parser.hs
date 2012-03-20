@@ -31,13 +31,13 @@ piece = many1 $ symbol <|> alphaNum
 
 serverParser :: Parser Message
 serverParser = Message
-    <$> parseUsername
+    <$> parseNick
     <*> parseCmd
     <*> parseChan
     <*> parseMessage
 
-parseUsername :: Parser String
-parseUsername = between (char ':') (char '!') (many1 alphaNum)
+parseNick :: Parser String
+parseNick = between (char ':') (char '!') (many1 alphaNum)
 
 parseCmd :: Parser String
 parseCmd = piece >> between space space (many1 alphaNum)
