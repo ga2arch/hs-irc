@@ -1,9 +1,6 @@
-
-
 import System.IO
 import Network
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.State
 import qualified Data.Map as Map
 import Text.Printf
@@ -37,8 +34,7 @@ connect = do
 
 run :: EventNet ()
 run = do
-    mapM subscribe [("ping", pong),
-                    ("id", cmdId),
+    mapM subscribe [("id", cmdId),
                     ("hpaste", cmdHpaste)]
     write "NICK" nick
     write "USER" $ nick ++ " 0 * :tut bot"
@@ -52,36 +48,35 @@ write :: String -> String -> EventNet ()
 write s t = do
       h <- asks socket
       liftIO $ hPrintf h "%s %s \r\n" s t
-      liftIO $ printf "> %s %s \n" s t
+      -- liftIO $ printf "> %s %s \n" s t
 
 ircLoop :: Handle -> EventNet ()
 ircLoop h = forever $ do
         t <- liftIO $ hGetLine h
         let s = init t
         liftIO $ putStrLn s
-        if ping s then broadcast "ping" "" s else eval $ runP serverParser s
+        if ping s then pong s else eval $ runP serverParser s
    where
         ping x = "PING :" `isPrefixOf` x
+        pong x = write "PONG" $ ':' : drop 6 x
 
 eval :: Maybe Message -> EventNet ()
 eval (Just m) = if "@" `isPrefixOf` (message m)
-                then dispatch (chan m) $ runP userCmdParser (message m)
+                then dispatch m $ runP userCmdParser (message m)
                 else return ()
      where
-        dispatch chan (Just u) = broadcast (cmd u) chan (args u)
+        dispatch m (Just u) = broadcast (cmd u) m u
         dispatch _ _ = return ()
 eval _ = return ()
 
 privmsg :: String -> String -> EventNet ()
-privmsg chan s = do
-        write "PRIVMSG" $ chan ++ " :" ++ s
-        return ()
+privmsg chan s = write "PRIVMSG" $ chan ++ " :" ++ s
 
-pong :: String -> String -> EventNet ()
-pong _ x = write "PONG" $ ':' : drop 6 x
+cmdId :: Message -> UserCmd -> EventNet ()
+cmdId m u = privmsg (chan m) (message m)
 
-cmdId :: String -> String -> EventNet ()
-cmdId chan x = privmsg chan x
+cmdHpaste :: Message -> UserCmd -> EventNet ()
+cmdHpaste m u = privmsg (chan m) "http://hpaste.org"
 
-cmdHpaste :: String -> String -> EventNet ()
-cmdHpaste chan x = privmsg chan "http://hpaste.org"
+cmdTell :: Message -> UserCmd -> EventNet ()
+cmdTell m u = privmsg (chan m) ""

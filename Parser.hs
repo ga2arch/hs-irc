@@ -6,11 +6,13 @@ module Parser
        , runP
        ) where
 
-import Text.ParserCombinators.Parsec
+import Control.Applicative
+import Text.ParserCombinators.Parsec hiding (many, optional, (<|>))
+import Control.Monad
 
 data Message = Message { username :: String
-                       , chan :: String
                        , command :: String
+                       , chan :: String
                        , message :: String
                        }
     deriving (Show)
@@ -18,6 +20,7 @@ data Message = Message { username :: String
 data UserCmd = UserCmd { cmd :: String
                        , args :: String
                        }
+    deriving (Show)
 
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~."
@@ -28,74 +31,30 @@ word = many1 alphaNum
 pstr :: Parser String
 pstr = many1 $ symbol <|> alphaNum
 
-parseServerLine :: Parser Message
-parseServerLine = do
-                char ':'
-                server <- pstr
-                space
-                num <- word
-                space
-                username <- pstr
-                space
-                char ':'
-                msg <- many1 $ symbol <|> alphaNum <|> space
-                return Message { username = server
-                               , chan = ""
-                               , command = ""
-                               , message = msg
-                               }
-
 parseLine :: Parser Message
-parseLine = do
-          nick <- parseUsername
-          cmd <- parseCmd
-          cn <- parseChan
-          msg <- (parseMessage <|> string "")
-          return msg
-          return Message { username = nick
-                         , chan = cn
-                         , command = cmd
-                         , message = msg
-                         }
+parseLine = Message <$> parseUsername
+          <*> parseCmd
+          <*> parseChan
+          <*> (parseMessage <|> string "")
 
 parseUsername :: Parser String
-parseUsername = do
-              char ':'
-              username <- word
-              char '!'
-              return username
+parseUsername = between (char ':') (char '!') word
 
 parseCmd :: Parser String
-parseCmd = do
-         _ <- pstr
-         space
-         cmd <- word
-         space
-         return cmd
+parseCmd = pstr >> between space space word
 
 parseChan :: Parser String
-parseChan = do
-          char '#'
-          chan <- pstr
-          space
-          return $ '#':chan
+parseChan = liftM ('#':) (between (char '#') space pstr)
 
 parseMessage :: Parser String
-parseMessage = do
-             char ':'
-             msg <- many1 $ symbol <|> alphaNum <|> space
-             return msg
+parseMessage = (char ':') >> (many1 $ symbol <|> alphaNum <|> space)
 
 serverParser :: Parser Message
 serverParser = parseLine
 
-
 userCmdParser :: Parser UserCmd
-userCmdParser = do
-             char '@'
-             cmd <- pstr
-             args <- try (many1 $ symbol <|> alphaNum <|> space) <|> string ""
-             return $ UserCmd cmd args
+userCmdParser = (char '@') >> (UserCmd <$> pstr
+              <*> (try (many1 $ symbol <|> alphaNum <|> space) <|> string ""))
 
 runP :: Parser a -> String -> Maybe a
 runP p input
