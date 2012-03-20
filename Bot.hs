@@ -61,7 +61,9 @@ onConnect _ = do
 onPing (S s) = do
     write "PONG :" s
 
-onPrivmsg (M m) = route $ runP userCmdParser (userMsg m)
+onPrivmsg (M m) = if "@" `isPrefixOf` (userMsg m)
+                     then route $ runP userCmdParser (userMsg m)
+                     else return ()
   where
     route (Just c) = broadcast (UserCmd $ cmd c) $ D m c
     route _ = return ()
