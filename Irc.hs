@@ -4,13 +4,14 @@ module Irc where
 
 import Network
 import System.IO
+import Control.Concurrent
 import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.List
 
-import Parser
+import IrcParser
 
 data Bot = Bot { socket :: Handle }
 data Event = Connected
@@ -61,4 +62,9 @@ broadcast :: Event -> Args -> EIrc ()
 broadcast evt args = do
     m <- get
     let funs = fromMaybe [] $ Map.lookup evt m
-    mapM_ (\(f, i) -> f args evt i) $ zip funs (iterate (+1) 1)
+    mapM_ (\(f, i) -> do
+              t <- (forkIO . liftIO $ f args evt i)
+              return ()
+          )
+      (zip funs (iterate (+1) 1))
+    return ()
